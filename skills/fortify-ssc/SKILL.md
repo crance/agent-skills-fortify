@@ -30,8 +30,6 @@ Only key MCP tools for SSC are listed here.
 | `fcli_ssc_issue_count` | Group and count issues | Count issues grouped by severity, category, etc. Always include `--by` parameter |
 | `fcli_ssc_mcp_job` | Wait for background jobs to complete | When `pagination.jobToken` is present in responses |
 
-**Tool Name Convention**: This skill uses short tool names (e.g., `fcli_ssc_app_list`) for readability. The actual MCP tool names depend on your MCP server configuration and may include a prefix like `mcp_fcli-ssc_` (e.g., `mcp_fcli-ssc_fcli_ssc_app_list`). When invoking tools, the platform typically handles the naming convention automatically.
-
 ## Parameter Formats
 Common formats and examples for key parameters:
 | Parameter | Format | Example |
@@ -39,18 +37,19 @@ Common formats and examples for key parameters:
 | `appVersionNameOrId` or `--appversion` | `"<App>:<Version>"` - case-sensitive, colon-separated |  `"MyApp:MyRelease"` |
 | `--filter` | `"<FilterType>:<Value>"` - preferred server-side filtering; discover via `issue_list_filters` first | `"Folder:Critical"` |
 | `--filterset` | Filter set title or ID - predefined SSC filter combinations (e.g., "Security Auditor View", "Quick View"); distinct from `--filter` | `"Security Auditor View"` |
-| `--embed` (for issues) | Comma-separated: `details`, `comments`, `auditHistory` | `"details,auditHistory"` |
-| `--embed` (for appversions) | Comma-separated: `attrs`, `attrValuesByName`, `attrValuesByGuid`, `bugtracker`, `customTags`, `filterSets`, `folders`, `resultProcessingRules` | `"attrs,customTags"` |
+| `--embed` | Comma-separated values to include additional data (see reference files for specific options) | `"details,auditHistory"` |
 | `--by` | Group name from `issue_list_groups` - **always include when using `issue_count`** | `"Folder"`, `"Category"` |
 
 ## Authentication
-Always verify session before any SSC operation:
+**All operations require authentication.** Always verify session before any  operation:
 ```tool
 fcli_ssc_session_list with refresh-cache=true
 ```
 - If `Expired` = `No` → proceed
 - If expired → ask user to run locally: `fcli ssc session login --url "<URL>" -u "<user>" -p '<pass>'`
 - When running any SSC tool, if authentication error occurs, prompt user to re-authenticate locally.
+
+**Note:** Reference workflows assume authentication has been verified.
 
 ## Filtering: Prefer --filter; query Optional
 - **Prefer `--filter`** for server-side filtering (fastest, smallest payloads)
@@ -80,7 +79,6 @@ fcli_ssc_session_list with refresh-cache=true
 ## Best Practices
 **DO:**
 - ✅ Use `--filter` for filtering
-- ✅ Handle tool errors gracefully
 - ✅ Prioritize server-side filtering over client-side
 - ✅ Prioritize use MCP tool over FCLI CLI directly
 
@@ -96,6 +94,7 @@ fcli_ssc_session_list with refresh-cache=true
 |----------|----------------------|
 | [List and find Applications Versions](references/list-application-version.md) | "list applications", "show application versions", "what applications are available" |
 | [List, Filter and Query Issues](references/list-filter-query-issues.md) | "list vulnerabilities", "show security issues", "filter issues by severity", "include suppressed issues" |
+| [Summarise and Count Issues](references/issue-summary.md) | "count issues", "show summary", "breakdown by severity" |
 | [Provide Recommendations](references/provide-recommendations.md) | "show recommendations", "provide remediation advice", "how to fix" |
 | [Background Job Handling](references/mcp-job-wait.md) | When `pagination.jobToken` appears in responses, background data loading |
 ### External Resources

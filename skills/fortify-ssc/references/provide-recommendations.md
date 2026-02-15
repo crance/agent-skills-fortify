@@ -1,18 +1,11 @@
 # Provide vulnerability recommendations
+**Prerequisites:** Authentication verified (see SKILL.md)
 
 ## Use Case
 You are asked to provide recommendations from the scan findings.
 
 ## Workflow Steps
-### Step 1 - Verify Authentication
-```tool
-fcli_ssc_session_list
-```
-**Expected**: `Expired` column shows `No`
-
----
-
-### Step 2 - Retrieve the issue details
+### Step 1 - Retrieve the issue details
 If no issue id is provided, retrieve details, including audit history of Critical and High Issues and combine into a list.
 ```tool
 fcli_ssc_issue_list --appversion "MyApp:MyRelease" --embed "details" --filter "Folder:Critical"
@@ -71,7 +64,7 @@ Example with Aviator's code fix suggestion:
 
 ---
 
-### Step 3 - Provide Recommendations
+### Step 2 - Provide Recommendations
 Open issues are issues that have not been hidden (`hidden: false`), removed (`removed: false`),  suppressed (`suppressed: false`), or `Analysis` tag is not `Not an Issue` 
 
 If there is a code fix suggestion provided by Aviator, we should use it. Otherwise, use the information from `recommendation` attribue.

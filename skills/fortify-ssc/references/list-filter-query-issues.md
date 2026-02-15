@@ -1,18 +1,11 @@
 # List issues and apply filtering
+**Prerequisites:** Authentication verified (see SKILL.md)
 
 ## Use Case
 You need to review all critical vulnerabilities in the "MyApp:MyRelease" application to prioritize remediation efforts.
 
 ## Workflow Steps
-### Step 1 - Verify Authentication
-```tool
-fcli_ssc_session_list
-```
-**Expected**: `Expired` column shows `No`
-
----
-
-### Step 2 - Verify if Application Version exists
+### Step 1 - Verify if Application Version exists
 ```tool
 fcli_ssc_appversion_get appVersionNameOrId "MyApp:MyRelease"
 ```
@@ -20,7 +13,7 @@ fcli_ssc_appversion_get appVersionNameOrId "MyApp:MyRelease"
 
 ---
 
-### Step 3 - Discover available filters
+### Step 2 - Discover available filters
 ```tool
 fcli_ssc_issue_list_filters --appversion "MyApp:MyRelease"
 ```
@@ -28,7 +21,7 @@ fcli_ssc_issue_list_filters --appversion "MyApp:MyRelease"
 
 ---
 
-### Step 4: List Critical Issues
+### Step 3: List Critical Issues
 ```tool
 fcli_ssc_issue_list --appversion "MyApp:MyRelease" --filter "Folder:Critical" --embed "details"
 ```
@@ -50,7 +43,7 @@ fcli_ssc_issue_list --appversion "MyApp:MyRelease" --filter "Folder:Critical" --
 
 ---
 
-### Step 5: Get Critical Issue Count
+### Step 4: Get Critical Issue Count
 ```tool
 fcli_ssc_issue_count --appversion "MyApp:MyRelease" --by "Folder"
 ```
@@ -86,12 +79,14 @@ fcli_ssc_issue_list --appversion "MyApp:MyRelease" --embed "details"
 fcli_ssc_issue_list --appversion "MyApp:MyRelease" --include "suppressed"
 ```
 
-| `--embed` options | `--include` options |
+| `--embed` options (issues) | `--include` options |
 |-------------------|---------------------|
 | `details` - Vulnerability details | `visible` - (default) |
 | `comments` - User comments | `hidden` - Hidden issues |
 | `auditHistory` - Audit trail | `removed` - Removed issues |
 | Combine: `"details,auditHistory"` | `suppressed` - Suppressed |
+
+**For appversions**, `--embed` supports: `attrs`, `attrValuesByName`, `attrValuesByGuid`, `bugtracker`, `customTags`, `filterSets`, `folders`, `resultProcessingRules` (example: `--embed "attrs,customTags"`)
 
 ### Apply filters
 ```tool
