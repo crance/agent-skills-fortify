@@ -1,18 +1,11 @@
 # Summarise and count issues
+**Prerequisites:** Authentication verified (see SKILL.md)
 
 ## Use Case
 Generate a summary report showing issue distribution by severity (Critical, High, Medium, Low) and by vulnerability category (SQL Injection, XSS, etc.) for management review.
 
 ## Workflow Steps
-### Step 1 - Verify Authentication
-```tool
-fcli_ssc_session_list
-```
-**Expected**: `Expired` column shows `No`
-
----
-
-### Step 2 - Verify if Application Version exists
+### Step 1 - Verify if Application Version exists
 ```tool
 fcli_ssc_appversion_get appVersionNameOrId "MyApp:MyRelease"
 ```
@@ -20,7 +13,7 @@ fcli_ssc_appversion_get appVersionNameOrId "MyApp:MyRelease"
 
 ---
 
-### Step 3 - Discover available grouping
+### Step 2 - Discover available grouping
 ```tool
 fcli_ssc_issue_list_groups --appversion "MyApp:MyRelease"
 ```
@@ -32,7 +25,7 @@ fcli_ssc_issue_list_groups --appversion "MyApp:MyRelease"
 
 ---
 
-### Step 4: Get Issue Count by Severity
+### Step 3: Get Issue Count by Severity
 ```tool
 fcli_ssc_issue_count --appversion "MyApp:MyRelease" --by "Folder"
 ```
@@ -48,7 +41,7 @@ Low             45
 
 ---
 
-### Step 5: Get Issue Count by Category
+### Step 4: Get Issue Count by Category
 ```tool
 fcli_ssc_issue_count --appversion "MyApp:MyRelease" --by "Category"
 ```
@@ -65,7 +58,7 @@ Weak Cryptography          4
 
 ---
 
-### Step 6: Get Issue Count by OWASP Top 10
+### Step 5: Get Issue Count by OWASP Top 10
 ```tool
 fcli_ssc_issue_count --appversion "MyApp:MyRelease" --by "OWASP Top 10 2021"
 ```
@@ -81,7 +74,7 @@ A03 Injection                               12
 
 ---
 
-### Step 7: List Top Critical Issues
+### Step 6: List Top Critical Issues
 ```tool
 # First discover filters
 fcli_ssc_issue_list_filters --appversion "MyApp:MyRelease"

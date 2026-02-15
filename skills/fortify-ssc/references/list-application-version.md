@@ -1,4 +1,6 @@
 # Listing Applications and Versions
+**Prerequisites:** Authentication verified (see SKILL.md)
+
 **List Applications**
 ```tool
 fcli_ssc_app_list
@@ -15,15 +17,7 @@ fcli_ssc_appversion_list
 You need to get the application version id for subsequent processing.
 
 ## Workflow Steps
-### Step 1 - Verify Authentication
-```tool
-fcli_ssc_session_list
-```
-**Expected**: `Expired` column shows `No`
-
----
-
-### Step 2 - Verify if Application Version exists
+### Step 1 - Verify if Application Version exists
 ```tool
 fcli_ssc_appversion_get appVersionNameOrId "MyApp:MyRelease"
 ```
@@ -31,7 +25,7 @@ fcli_ssc_appversion_get appVersionNameOrId "MyApp:MyRelease"
 
 ---
 
-### Step 3 - If Application Version Not Found
+### Step 2 - If Application Version Not Found
 If Step 2 fails, use a `client-side query` to help the user find the correct name.
 
 **Search by application name (partial match):**
@@ -46,7 +40,7 @@ fcli_ssc_appversion_list query { "application.name": ".*MyApp.*" }
 
 ---
 
-### Step 4 - Handle Multiple Results
+### Step 3 - Handle Multiple Results
 When a query returns multiple matches:
 
 1. **Present results to the user** as a numbered list:
@@ -58,7 +52,7 @@ When a query returns multiple matches:
 
 ---
 
-### Step 5 - Retrieve Version Details
+### Step 4 - Retrieve Version Details
 Once the user confirms the correct version, retrieve full details:
 ```tool
 fcli_ssc_appversion_get appVersionNameOrId "MyApp:2.0"
