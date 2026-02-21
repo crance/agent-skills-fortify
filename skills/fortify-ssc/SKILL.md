@@ -99,5 +99,5 @@ fcli_ssc_session_list with refresh-cache=true
 | [Background Job Handling](references/mcp-job-wait.md) | When `pagination.jobToken` appears in responses, background data loading |
 ### External Resources
 - [FCLI Documentation](https://fortify.github.io/fcli/)
-- [SSC Documentation (version in YY.<Quarter>.<patch> format)](https://www.microfocus.com/documentation/fortify-software-security-center/)
+- [SSC Documentation (version format: YY.Quarter.patch, e.g., 25.4.0)](https://www.microfocus.com/documentation/fortify-software-security-center/)
 - [SSC User Guide](https://www.microfocus.com/documentation/fortify-software-security-center/2540/ssc-ugd-html-25.4.0/index.html)
