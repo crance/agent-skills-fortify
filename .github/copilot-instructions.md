@@ -91,7 +91,7 @@ Only key MCP tools for {product} are listed here.
 |-----------|-------------|-------------|
 | `fcli_{product}_...` | ... | ... |
 
-## Parameter Formats (Required)
+## Parameter Formats
 | Parameter | Format | Example |
 |-----------|--------|---------|
 | ... | ... | ... |
@@ -149,8 +149,8 @@ How to handle large result sets, jobToken, pagination-offset.
 | Product | Session Check | Login Command |
 |---------|---------------|---------------|
 | SSC | `fcli_ssc_session_list` | `fcli ssc session login --url <URL> -u <user> -p <pass>` |
-| SC-SAST | `fcli_ssc_session_list` | `fcli ssc session login --ssc-url <URL> --ssc-user <user> -p <pass> --client-auth-token <token>` |
-| SC-DAST | `fcli_ssc_session_list` | `fcli ssc session login --ssc-url <URL> --ssc-user <user> -p <pass>` |
+| SC-SAST | `fcli_ssc_session_list` | `fcli ssc session login --ssc-url <URL> -u <user> -p <pass> --sc-sast-url <URL> --client-auth-token <token>`  |
+| SC-DAST | `fcli_ssc_session_list` | `fcli ssc session login --ssc-url <URL> -u <user> -p <pass>` |
 | FoD | `fcli_fod_session_list` | `fcli fod session login --url <URL> --client-id <id> --client-secret <secret>` |
 
 ---

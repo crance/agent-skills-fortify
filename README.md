@@ -114,7 +114,7 @@ npx skills add https://github.com/crance/agent-skills-fortify --skill fortify-fo
 ## Authentication
 **Authenticate to FoD**
 ```bash
-fcli fod session login --url <URL> --client-id <id> --client-secret <secret>
+fcli fod session login --url "<URL>" --client-id "<id>" --client-secret '<secret>'
 ```
 
 **Authenticate to SSC**
