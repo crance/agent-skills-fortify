@@ -1,6 +1,14 @@
 # Running SCA/OSS Scans
 **Prerequisites:** Authentication verified (see SKILL.md)
 
+## Contents
+- [Use Case](#use-case)
+- [Workflow Steps](#workflow-steps)
+- [Complete Example Flow](#complete-example-flow)
+- [Troubleshooting](#troubleshooting)
+- [Key Differences from SAST Scans](#key-differences-from-sast-scans)
+- [Common Package Managers and Dependency Files](#common-package-managers-and-dependency-files)
+
 ## Use Case
 You need to run a Software Composition Analysis (SCA) or Open Source Scan (OSS) to identify vulnerabilities in third-party libraries and open source components used by your application.
 
@@ -10,7 +18,7 @@ You need to run a Software Composition Analysis (SCA) or Open Source Scan (OSS) 
 First, identify the release to scan. If uncertain, see [Finding Releases](find-release.md).
 
 ```tool
-fcli_fod_release_get --qualifiedReleaseNameOrId "MyApp:MyRelease"
+fcli_fod_release_get qualifiedReleaseNameOrId "MyApp:MyRelease"
 ```
 **Expected**: Release details including ID and available assessment types
 
@@ -43,19 +51,24 @@ Package the application source code and dependencies for upload:
 
 ```tool
 fcli_fod_action_package 
-  output-file "sca-package.zip"
-  include "src/**,pom.xml,package.json,requirements.txt"
-  exclude "test/**,*.log"
+  --output "sca-package.zip"
+  --source-dir "."
+  --sc-client-version "auto"
+  --rel "MyApp:MyRelease"
 ```
 
 **Critical Parameters**:
-- `output-file`: Path for the generated zip file
-- `include`: Glob patterns for source files AND dependency manifests (pom.xml, package.json, etc.)
-- `exclude`: Glob patterns for files to exclude (optional)
+- `--output`: Path for the generated zip file
+- `--source-dir`: Root directory of the source code to package (must contain dependency manifests like pom.xml, package.json, etc.)
+- `--sc-client-version`: ScanCentral client version to use (use `"auto"` to auto-detect)
+- `--rel`: Release identifier (e.g., `"MyApp:MyRelease"`) — required in practice even though listed as optional
+- `--extra-opts`: Additional ScanCentral client options (optional)
 
 **Expected**: Package file created (e.g., `sca-package.zip`)
 
-**Important**: Make sure to include dependency manifest files (pom.xml, package.json, etc.) for accurate component detection.
+> ⚠️ **FCLI Bug**: The action script unconditionally evaluates `package.ossEnabled` to determine OSS flags. If `--rel` is omitted or no FoD session is active, the action crashes with a SpEL null-reference error. Always supply `--rel` and ensure an active FoD session.
+
+**Important**: Make sure `--source-dir` points to the directory containing dependency manifest files (pom.xml, package.json, etc.) for accurate component detection.
 
 ---
 
@@ -65,7 +78,7 @@ Upload the packaged source code and initiate the SCA/OSS scan:
 ```tool
 fcli_fod_oss_scan_start 
   --release "MyApp:MyRelease"
-  file "sca-package.zip"
+  --file "sca-package.zip"
 ```
 
 **Expected**: Scan initiated with scan ID returned
@@ -84,19 +97,40 @@ Example response:
 ### Step 6 - Monitor Scan Progress
 Monitor the scan until completion. **Use the scan ID returned from Step 5.** You can either:
 
-**Option A: Wait for completion (blocking)**
-```tool
-fcli_fod_oss_scan_wait_for 
-  scan-id "67890"
-  until "COMPLETED"
-  timeout "3600"
+#### Option A: Blocking Wait
+
+**Tool:** `fcli_fod_oss_scan_wait_for`
+
+```json
+{
+  "releaseQualifiedScanOrIds": "<release-id>:<scan-id>",
+  "--until": "all-match",
+  "--while": "any-match",
+  "--any-state": "Completed",
+  "--timeout": "1h"
+}
 ```
 
-**Option B: Check status periodically (non-blocking)**
-```tool
-fcli_fod_oss_scan_get releaseQualifiedScanOrId "67890"
+**Parameter Details:**
+- `releaseQualifiedScanOrIds` (**required**): Use `<release-id>:<scan-id>` from `releaseAndScanId` field of `oss_scan_start` response
+- `--until` (**required by MCP schema**): `"any-match"` or `"all-match"` — NOT a state name
+- `--while` (**required by MCP schema**): `"any-match"` or `"all-match"`
+- `--any-state`: Scan state to wait for (`Completed`, `Canceled`)
+- `--timeout`: Maximum wait time with unit suffix (e.g., `"30m"`, `"1h"`)
+
+> ⚠️ **MCP Schema Warning:** The MCP schema requires both `--until` AND `--while` simultaneously, but these are mutually exclusive options in the actual FCLI CLI. As a result, calls through the MCP tool may consistently return `exitCode: 2` with no output. **If this occurs, fall back to Option B (polling).**
+
+#### Option B: Polling (Recommended for MCP usage)
+
+**Tool:** `fcli_fod_oss_scan_get`
+
+```json
+{
+  "releaseQualifiedScanOrId": "<release-id>:<scan-id>"
+}
 ```
-> **Note**: The parameter name is `releaseQualifiedScanOrId`, and you must provide the **scan ID** (e.g., `"67890"`), not the release name. Get the scan ID from the `oss_scan_start` response in Step 5.
+
+Poll every 60–120 seconds until `analysisStatusType` is `Completed`.
 
 **Scan Status Values**:
 - `Queued` → Waiting to start
@@ -148,7 +182,7 @@ List the vulnerabilities found in the open source components:
 fcli_fod_issue_list 
   --release "MyApp:MyRelease"
   --embed "details,recommendations"
-  --filters-param "severityString:Critical"
+  query {"severity": "Critical"}
 ```
 
 **Expected**: List of vulnerabilities in third-party libraries with remediation advice
@@ -166,7 +200,7 @@ For remediation guidance, see [Remediation Workflow](remediation-workflow.md).
 fcli_fod_session_list refresh-cache=true
 
 # 2. Get release details
-fcli_fod_release_get --qualifiedReleaseNameOrId "MyApp:MyRelease"
+fcli_fod_release_get qualifiedReleaseNameOrId "MyApp:MyRelease"
 
 # 3. Check available assessment types
 fcli_fod_release_list_assessment_types --release "MyApp:MyRelease"
@@ -179,10 +213,13 @@ fcli_fod_action_package
 # 5. Start OSS/SCA scan
 fcli_fod_oss_scan_start 
   --release "MyApp:MyRelease"
-  file "sca-package.zip"
+  --file "sca-package.zip"
 
-# 6. Wait for completion
-fcli_fod_oss_scan_wait_for "67890" until "COMPLETED"
+# 6. Poll until completed (recommended for MCP)
+fcli_fod_oss_scan_get releaseQualifiedScanOrId "<release-id>:<scan-id>"
+# Repeat every 60-120s until analysisStatusType = "Completed"
+# Alternative (may return exitCode 2 via MCP due to schema constraints):
+# fcli_fod_oss_scan_wait_for releaseQualifiedScanOrIds "<release-id>:<scan-id>" --until "all-match" --while "any-match" --any-state "Completed" --timeout "1h"
 
 # 7. List detected components
 fcli_fod_oss_scan_list_components --release "MyApp:MyRelease"
@@ -191,6 +228,7 @@ fcli_fod_oss_scan_list_components --release "MyApp:MyRelease"
 fcli_fod_issue_list 
   --release "MyApp:MyRelease"
   --embed "details"
+  query {"severity": "Critical"}
 ```
 
 ---

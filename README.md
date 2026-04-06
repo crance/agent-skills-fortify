@@ -102,14 +102,18 @@ New-Item -ItemType SymbolicLink -Path "~\.claude\skills\fortify-fod" -Target "$p
 
 ### Option 2: Install via npx
 ```bash
-# On-premise
-npx skills add https://github.com/crance/agent-skills-fortify --skill fortify-ssc
-npx skills add https://github.com/crance/agent-skills-fortify --skill fortify-scsast
-npx skills add https://github.com/crance/agent-skills-fortify --skill fortify-scdast
+# On-premise (SSC + SC-SAST + SC-DAST — combined skill)
+npx skills add https://github.com/crance/agent-skills-fortify --skill fortify-onprem
 
 # SaaS
 npx skills add https://github.com/crance/agent-skills-fortify --skill fortify-fod
 ```
+
+> **Note:** The individual `fortify-ssc`, `fortify-scsast`, and `fortify-scdast` skills have been consolidated into `fortify-onprem`. If you have the old skills installed, remove them and install the combined skill:
+> ```bash
+> npx skills remove fortify-ssc fortify-scsast fortify-scdast
+> npx skills add https://github.com/crance/agent-skills-fortify --skill fortify-onprem
+> ```
 
 ## Authentication
 **Authenticate to FoD**

@@ -1,6 +1,16 @@
 # Running DAST Scans
 **Prerequisites:** Authentication verified (see SKILL.md)
 
+## Contents
+- [Use Case](#use-case)
+- [Overview](#overview)
+- [Workflow Steps](#workflow-steps)
+- [Complete Example Flow (Website Scan)](#complete-example-flow-website-scan)
+- [Complete Example Flow (API Scan)](#complete-example-flow-api-scan)
+- [Troubleshooting](#troubleshooting)
+- [Key Differences from SAST/SCA Scans](#key-differences-from-sastsca-scans)
+- [Network Access Requirements](#network-access-requirements)
+
 ## Use Case
 You need to run a Dynamic Application Security Testing (DAST) scan to test a running application for security vulnerabilities by actively probing and interacting with the application.
 
@@ -10,13 +20,15 @@ DAST scans are fundamentally different from SAST/SCA scans:
 - **Application must be accessible** - FoD needs network access to your app
 - **Three scan types**: Website, API, or Workflow-driven
 
+> **DAST Automated scans only**: The `dast_scan_setup_website`, `dast_scan_setup_api`, and `dast_scan_setup_workflow` MCP tools configure **DAST Automated** scans exclusively. Manually-conducted Dynamic Assessments (e.g. standard `"Dynamic Website Assessment"`) **cannot** be set up via these tools — FoD will reject them with HTTP 422. Only automated DAST assessment types (e.g. `"Dynamic+ Website Assessment"`) are compatible. Use `fcli_fod_release_list_assessment_types` to confirm which automated types are available for a release.
+
 ## Workflow Steps
 
 ### Step 1 - Select Release
 First, identify the release to scan. If uncertain, see [Finding Releases](find-release.md).
 
 ```tool
-fcli_fod_release_get --qualifiedReleaseNameOrId "MyApp:MyRelease"
+fcli_fod_release_get qualifiedReleaseNameOrId "MyApp:MyRelease"
 ```
 **Expected**: Release details including ID and available assessment types
 
@@ -61,54 +73,74 @@ fcli_fod_dast_scan_get_config --release "MyApp:MyRelease"
 
 ### Step 4 - Configure DAST Scan Settings
 
-#### Option A: Website DAST Scan
+#### Option A: Website DAST Scan (Automated Only)
+
+> **Important**: `dast_scan_setup_website` configures **DAST Automated** scans only. Standard "Dynamic Website Assessment" (manually conducted by FoD testing team) is **not supported** by this tool. Only automated DAST assessment types (e.g. `Dynamic+ Website Assessment`) work. Use `fcli_fod_release_list_assessment_types` to find automated DAST types available for the release.
+
 ```tool
 fcli_fod_dast_scan_setup_website 
   --release "MyApp:MyRelease"
-  url "https://example.com"
-  scan-type "Standard"
-  assessment-type "Dynamic Assessment"
+  --site-url "https://example.com"
+  --assessment-type "Dynamic+ Website Assessment"
+  --entitlement-frequency "Subscription"
 ```
 
 **Parameters**:
-- `url`: Target website URL (must be accessible from FoD)
-- `scan-type`: Standard, Express, or other available types
-- `assessment-type`: Type of DAST assessment purchased
+- `--site-url`: Target website URL (must be accessible from FoD)
+- `--assessment-type`: Name of a **DAST Automated** assessment type — check available types with `fcli_fod_release_list_assessment_types` and filter for `scanType: "Dynamic"`
+- `--entitlement-frequency`: `Subscription` or `SingleScan`
 
 ---
 
 #### Option B: API DAST Scan
+
+> **Important**: `dast_scan_setup_api` configures **DAST Automated** scans only. Only `"DAST Automated"` is a valid assessment type — standard API assessment types (e.g. `"Dynamic+ API Assessment"`) will be rejected with HTTP 422. Use `fcli_fod_release_list_assessment_types` to confirm availability.
+
+**Option B1 — URL-based spec** (provide API spec via URL):
 ```tool
 fcli_fod_dast_scan_setup_api 
   --release "MyApp:MyRelease"
-  api-spec-file "openapi.json"
-  base-url "https://api.example.com/v1"
+  --type "OpenApi"
+  --api-url "https://api.example.com/openapi.json"
+  --assessment-type "DAST Automated"
+  --entitlement-frequency "Subscription"
+```
+
+**Option B2 — File-based spec** (upload local API spec file):
+```tool
+fcli_fod_dast_scan_setup_api 
+  --release "MyApp:MyRelease"
+  --type "OpenApi"
+  --file "openapi.json"
+  --assessment-type "DAST Automated"
+  --entitlement-frequency "Subscription"
 ```
 
 **Parameters**:
-- `api-spec-file`: Path to OpenAPI/Swagger specification
-- `base-url`: Base URL for API endpoints
-
-If you have the API spec file to upload:
-```tool
-fcli_fod_dast_scan_upload_file 
-  --release "MyApp:MyRelease"
-  file "openapi.json"
-```
+- `--type`: API specification format — `OpenApi`, `Postman`, `GraphQL`, or `Grpc`
+- `--api-url`: URL to the API specification (use instead of `--file` for URL-based specs)
+- `--file`: Path to local API specification file (use instead of `--api-url` for local files; file is uploaded automatically)
+- `--assessment-type`: Must be `"DAST Automated"` — standard API assessment types are not compatible
+- `--entitlement-frequency`: `Subscription` or `SingleScan`
 
 ---
 
 #### Option C: Workflow DAST Scan
+
+> **Important**: `dast_scan_setup_workflow` configures **DAST Automated** workflow-driven scans only. Standard Dynamic Website Assessment types will be rejected with HTTP 422. Only `"DAST Automated"` is a valid assessment type. Use `fcli_fod_release_list_assessment_types` to confirm availability.
+
 ```tool
 fcli_fod_dast_scan_setup_workflow 
   --release "MyApp:MyRelease"
-  workflow-file "recorded-session.webmacro"
-  url "https://example.com"
+  --file "recorded-session.webmacro"
+  --assessment-type "DAST Automated"
+  --entitlement-frequency "Subscription"
 ```
 
 **Parameters**:
-- `workflow-file`: Browser automation/macro file
-- `url`: Starting URL for the workflow
+- `--file`: Path to the workflow/macro file (e.g. `.webmacro` recorded browser automation)
+- `--assessment-type`: Must be `"DAST Automated"` — standard Dynamic types are not compatible
+- `--entitlement-frequency`: `Subscription` or `SingleScan`
 
 ---
 
@@ -176,7 +208,7 @@ Once the scan completes, list the vulnerabilities found:
 fcli_fod_issue_list 
   --release "MyApp:MyRelease"
   --embed "details,recommendations"
-  --filters-param "severityString:Critical"
+  query {"severity": "Critical"}
 ```
 
 **Expected**: List of dynamic security vulnerabilities (XSS, SQL injection, authentication issues, etc.)
@@ -198,16 +230,17 @@ For remediation guidance, see [Remediation Workflow](remediation-workflow.md).
 fcli_fod_session_list refresh-cache=true
 
 # 2. Get release details
-fcli_fod_release_get --qualifiedReleaseNameOrId "MyApp:MyRelease"
+fcli_fod_release_get qualifiedReleaseNameOrId "MyApp:MyRelease"
 
 # 3. Check existing DAST configuration
 fcli_fod_dast_scan_get_config --release "MyApp:MyRelease"
 
-# 4. Configure website DAST scan (after asking user for URL)
+# 4. Configure website DAST scan (Automated only — use fcli_fod_release_list_assessment_types to find valid automated type)
 fcli_fod_dast_scan_setup_website 
   --release "MyApp:MyRelease"
-  url "https://example.com"
-  scan-type "Standard"
+  --site-url "https://example.com"
+  --assessment-type "Dynamic+ Website Assessment"
+  --entitlement-frequency "Subscription"
 
 # 5. Start DAST scan (NO PACKAGING!)
 fcli_fod_dast_scan_start --release "MyApp:MyRelease"
@@ -230,25 +263,24 @@ fcli_fod_issue_list
 fcli_fod_session_list refresh-cache=true
 
 # 2. Get release details
-fcli_fod_release_get --qualifiedReleaseNameOrId "MyApp:MyRelease"
+fcli_fod_release_get qualifiedReleaseNameOrId "MyApp:MyRelease"
 
-# 3. Upload API specification
-fcli_fod_dast_scan_upload_file 
-  --release "MyApp:MyRelease"
-  file "openapi.json"
-
-# 4. Configure API DAST scan
+# 3. Configure API DAST scan (upload spec inline via --file)
 fcli_fod_dast_scan_setup_api 
   --release "MyApp:MyRelease"
-  api-spec-file "openapi.json"
-  base-url "https://api.example.com/v1"
+  --type "OpenApi"
+  --file "openapi.json"
+  --assessment-type "DAST Automated"
+  --entitlement-frequency "Subscription"
 
-# 5. Start DAST scan
+# 4. Start DAST scan
 fcli_fod_dast_scan_start --release "MyApp:MyRelease"
 
-# 6. Monitor and view results
+# 5. Monitor and view results
 fcli_fod_dast_scan_list --release "MyApp:MyRelease"
 ```
+
+> **Advanced**: If you need to reuse the same spec file across multiple releases, pre-upload it once with `fcli_fod_dast_scan_upload_file --release "MyApp:MyRelease" --file "openapi.json" --file-type "OpenAPIDefinition"`, then reference the returned `fileId` via `--file-id` in `setup_api` instead of `--file`.
 
 ---
 

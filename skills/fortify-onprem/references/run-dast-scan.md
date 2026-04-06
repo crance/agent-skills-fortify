@@ -12,6 +12,12 @@ run scan, DAST, start scan, web scan, application scan, dynamic scan, security s
 - **Scan settings configured to auto-publish results to SSC** (configured by administrator)
 - Target web application URL configured in scan settings
 
+## Contents
+- [Workflow Steps](#workflow-steps)
+- [Complete Example](#complete-example)
+- [Troubleshooting](#troubleshooting)
+- [Tips for Success](#tips-for-success)
+
 ## Workflow Steps
 
 ### Step 1: Check Authentication
@@ -80,7 +86,7 @@ List of available policies such as:
   "--settings": "MY_WEB_APP_SETTINGS",
   "--name": "Weekly Security Scan - Feb 2026",
   "--policy": "Standard",
-  "--overwrite-scan-mode": true
+  "--mode": "CrawlAndAudit"
 }
 ```
 
@@ -88,7 +94,7 @@ List of available policies such as:
 - `--settings` (**required**): CICD token or ID from Step 2
 - `--name` (**required**): Descriptive scan name
 - `--policy` (optional): Policy name or ID from Step 3
-- `--overwrite-scan-mode` or `--priority-scan-mode` (optional): Boolean flags for scan mode (mutually exclusive)
+- `--mode` (optional): Scan mode string — `"CrawlOnly"`, `"CrawlAndAudit"`, or `"AuditOnly"`
 - `--login-macro` (optional): Login macro ID if authenticated scanning required
 
 **Expected Output:**  
@@ -100,36 +106,47 @@ Scan created successfully with:
 ---
 
 ### Step 5: Monitor Scan Progress
-**Tool:** `fcli_sc_dast_scan_wait_for`
 
-**Parameters:**
+**Option B (Recommended for MCP): Poll with `scan_get`**
+
+Use `scan_get` polling — the reliable method for MCP usage:
+
+```json
+{
+  "tool": "fcli_sc_dast_scan_get",
+  "parameters": {
+    "scanId": "<scan-id>"
+  }
+}
+```
+
+Check `scanStatusTypeDescription` in the response. Repeat every 30–60 seconds until the status is `Complete`, `Failed`, or another terminal state.
+
+**Terminal states:** `Complete`, `ForcedComplete`, `Interrupted`, `FailedToStart`, `ImportScanResultsFailed`, `FailedToImportScanFile`
+
+---
+
+**Option A (Best-Effort): `fcli_sc_dast_scan_wait_for`**
+
+> ⚠️ **MCP Schema Bug:** The MCP schema requires both `--until` and `--while` simultaneously, but the underlying CLI treats them as mutually exclusive. Providing both causes `exitCode: 2`. This tool may not function reliably via MCP. Use Option B (scan_get polling) as the primary approach.
+
+Best-effort call (may return `exitCode: 2`):
 ```json
 {
   "scanIds": "<scan-id-from-step-4>",
-  "--until": "status=Complete",
-  "--timeout": "7200"
+  "--until": "any-match",
+  "--while": "any-match",
+  "--any-state": "Complete",
+  "--timeout": "2h"
 }
 ```
 
 **Parameter Details:**
 - `scanIds`: Scan ID from Step 4
-- `--until`: Condition to wait for ("status=Complete" or "status=Failed")
-- `--timeout`: Maximum wait time in seconds (7200 = 2 hours)
-
-**Expected Behavior:**
-- Tool will poll scan status until condition met or timeout
-- DAST scans can take 30 minutes to several hours depending on application size
-- Adjust timeout based on expected scan duration
-
-**Alternative: Check Status Without Blocking**
-```json
-{
-  "tool": "fcli_sc_dast_scan_get",
-  "parameters": {
-    "scanIds": "<scan-id>"
-  }
-}
-```
+- `--until`: `"any-match"` or `"all-match"` — wait **until** scans reach the state
+- `--while`: `"any-match"` or `"all-match"` — wait **while** scans are in the state (required by schema)
+- `--any-state`: The target state (e.g., `"Complete"`, `"Failed"`)
+- `--timeout`: Maximum wait time (e.g., `"1h"`, `"2h"`)
 
 ---
 
@@ -144,8 +161,8 @@ Use SSC skill tools to view findings:
 {
   "tool": "fcli_ssc_issue_count",
   "parameters": {
-    "appversion": "<application:version>",
-    "by": "Folder"
+    "--appversion": "<application:version>",
+    "--by": "Folder"
   }
 }
 ```
@@ -155,9 +172,9 @@ Use SSC skill tools to view findings:
 {
   "tool": "fcli_ssc_issue_list",
   "parameters": {
-    "appversion": "<application:version>",
-    "filter": "CATEGORY:Security",
-    "embed": "details"
+    "--appversion": "<application:version>",
+    "--filter": "CATEGORY:Security",
+    "--embed": "details"
   }
 }
 ```
@@ -188,22 +205,21 @@ Use SSC skill tools to view findings:
       "--settings": "PRODUCTION_WEB_APP",
       "--name": "Weekly Production Scan - Week 7",
       "--policy": "Standard",
-      "--overwrite-scan-mode": true
+      "--mode": "CrawlAndAudit"
     }
   },
   {
-    "tool": "fcli_sc_dast_scan_wait_for",
+    "tool": "fcli_sc_dast_scan_get",
+    "comment": "Poll until scanStatusTypeDescription is Complete or Failed",
     "parameters": {
-      "scanIds": "12345",
-      "--until": "status=Complete",
-      "--timeout": "7200"
+      "scanId": "12345"
     }
   },
   {
     "tool": "fcli_ssc_issue_count",
     "parameters": {
-      "appversion": "MyWebApp:1.0",
-      "by": "Folder"
+      "--appversion": "MyWebApp:1.0",
+      "--by": "Folder"
     }
   }
 ]

@@ -9,6 +9,14 @@ list scans, monitor progress, check status, pause scan, resume scan, scan manage
 ## Prerequisites
 - Active SSC session (check with `fcli_ssc_session_list`)
 
+## Contents
+- [Workflow Operations](#workflow-operations) — list, filter, pause, resume scans
+- [Complete Example: Monitor and Manage Workflow](#complete-example-monitor-and-manage-workflow)
+- [Pagination Handling](#pagination-handling)
+- [Troubleshooting](#troubleshooting)
+- [Tips for Effective Monitoring](#tips-for-effective-monitoring)
+- [Best Practices](#best-practices)
+
 ---
 
 ## Workflow Operations
@@ -58,16 +66,16 @@ List of all scans with:
 
 ---
 
-### 2. Filter Scans by Status (Server-Side)
+### 2. Filter Scans by Status
 
-Use `server-queries` parameter for efficient server-side filtering:
+Use the client-side `query` parameter with the `scanStatusTypeDescription` regex field:
 
 **Running Scans:**
 ```json
 {
   "tool": "fcli_sc_dast_scan_list",
   "parameters": {
-    "--server-queries": "status=Running"
+    "query": { "scanStatusTypeDescription": "Running" }
   }
 }
 ```
@@ -77,7 +85,7 @@ Use `server-queries` parameter for efficient server-side filtering:
 {
   "tool": "fcli_sc_dast_scan_list",
   "parameters": {
-    "--server-queries": "status=Complete"
+    "query": { "scanStatusTypeDescription": "Complete" }
   }
 }
 ```
@@ -87,7 +95,7 @@ Use `server-queries` parameter for efficient server-side filtering:
 {
   "tool": "fcli_sc_dast_scan_list",
   "parameters": {
-    "--server-queries": "status=Paused"
+    "query": { "scanStatusTypeDescription": "Paused" }
   }
 }
 ```
@@ -97,10 +105,12 @@ Use `server-queries` parameter for efficient server-side filtering:
 {
   "tool": "fcli_sc_dast_scan_list",
   "parameters": {
-    "--server-queries": "status=Failed"
+    "query": { "scanStatusTypeDescription": "Failed" }
   }
 }
 ```
+
+> **Note:** The `--server-queries` `status=X` syntax does not filter by status (confirmed non-functional). Use client-side `query.scanStatusTypeDescription` instead.
 
 ---
 
@@ -111,48 +121,51 @@ Use `server-queries` parameter for efficient server-side filtering:
 **Parameters:**
 ```json
 {
-  "--server-queries": "name~Production"
+  "query": { "name": ".*Production.*" }
 }
 ```
 
-**Explanation:** The `~` operator performs a "contains" match. This will return all scans with "Production" in their name.
+**Explanation:** The `query.name` field accepts a regex pattern. Use `".*keyword.*"` for a contains match.
 
 **Examples:**
-- `"name~Security"` → Scans containing "Security"
-- `"name~Feb"` → Scans containing "Feb"
-- `"name~MyApp"` → Scans containing "MyApp"
+- `{ "name": ".*Security.*" }` → Scans containing "Security"
+- `{ "name": ".*Feb.*" }` → Scans containing "Feb"
+- `{ "name": ".*MyApp.*" }` → Scans containing "MyApp"
 
 ---
 
 ### 4. Multiple Filters (Combined)
 
-Combine multiple filters with comma separation:
+Combine status and name filters using the client-side `query` parameter:
 
 ```json
 {
   "tool": "fcli_sc_dast_scan_list",
   "parameters": {
-    "--server-queries": "status=Complete,name~Production"
+    "query": { "scanStatusTypeDescription": "Complete", "name": ".*Production.*" }
   }
 }
 ```
 
 **Example Combinations:**
-- `"status=Running,name~Security"` → Running scans containing "Security"
-- `"status=Complete,policy=Standard"` → Completed scans using Standard policy
+- Status Running + name contains "Security": `"query": { "scanStatusTypeDescription": "Running", "name": ".*Security.*" }`
+- Name only: `"query": { "name": ".*Production.*" }`
+- Status + application: `"query": { "scanStatusTypeDescription": "Complete", "applicationName": ".*MyApp.*" }`
 
 ---
 
 ### 5. Client-Side Filtering (Complex Expressions)
 
-Use `query` parameter for complex filtering with SpEL expressions:
+Use `query` parameter for client-side filtering. The `query` value must be a `FcliScDastScanListQuery` JSON object. All string fields accept regex patterns.
 
-**Example: Filter by scan version**
+**Available query fields:** `applicationName`, `applicationVersionName`, `criticalCount`, `highCount`, `id`, `lowCount`, `mediumCount`, `name`, `scanStatusTypeDescription`
+
+**Example: Filter by scan status**
 ```json
 {
   "tool": "fcli_sc_dast_scan_list",
   "parameters": {
-    "query": "scanVersion > 3"
+    "query": { "scanStatusTypeDescription": "Running" }
   }
 }
 ```
@@ -162,14 +175,14 @@ Use `query` parameter for complex filtering with SpEL expressions:
 {
   "tool": "fcli_sc_dast_scan_list",
   "parameters": {
-    "query": "status == 'Complete' && scanVersion > 5"
+    "query": { "scanStatusTypeDescription": "Complete", "name": ".*Production.*" }
   }
 }
 ```
 
 **When to Use:**
-- Server-side (`--server-queries`): Preferred for performance, simple key-value filtering
-- Client-side (`query`): Complex expressions not supported by server-side filtering
+- Client-side (`query`): Primary approach — regex matching on any field, multiple field conditions combined
+- Server-side (`--server-queries "searchText=keyword"`): Only for full-text keyword search across all scan fields
 
 ---
 
@@ -180,7 +193,7 @@ Use `query` parameter for complex filtering with SpEL expressions:
 **Parameters:**
 ```json
 {
-  "scanIds": "12345"
+  "scanId": "12345"
 }
 ```
 
@@ -196,53 +209,58 @@ Detailed information including:
 
 ### 7. Monitor Scan Progress (Blocking)
 
-**Tool:** `fcli_sc_dast_scan_wait_for`
+> ⚠️ **MCP Schema Bug:** The MCP schema requires both `--until` and `--while` simultaneously, but the underlying CLI treats them as mutually exclusive (`-u` OR `-w`). Providing both causes `exitCode: 2`. Use `scan_get` polling (Operation 6) as the reliable alternative.
 
-**Wait Until Complete:**
+**Recommended: Poll with `scan_get` (fully reliable)**
+```json
+{
+  "tool": "fcli_sc_dast_scan_get",
+  "parameters": {
+    "scanId": "12345"
+  }
+}
+```
+Check `scanStatusTypeDescription`. Repeat every 30–60 seconds until it reaches `Complete`, `Failed`, or another terminal state.
+
+**Terminal states:** `Complete`, `ForcedComplete`, `Interrupted`, `FailedToStart`, `ImportScanResultsFailed`, `FailedToImportScanFile`
+
+---
+
+**Best-Effort: `fcli_sc_dast_scan_wait_for` (may return exitCode 2)**
+
+Wait until Complete:
 ```json
 {
   "tool": "fcli_sc_dast_scan_wait_for",
   "parameters": {
     "scanIds": "12345",
-    "--until": "status=Complete",
-    "--timeout": "7200"
+    "--until": "any-match",
+    "--while": "any-match",
+    "--any-state": "Complete",
+    "--timeout": "2h"
   }
 }
 ```
 
-**Wait Until Failed:**
+Wait until Failed:
 ```json
 {
   "tool": "fcli_sc_dast_scan_wait_for",
   "parameters": {
     "scanIds": "12345",
-    "--until": "status=Failed",
-    "--timeout": "7200"
-  }
-}
-```
-
-**Wait While Running:**
-```json
-{
-  "tool": "fcli_sc_dast_scan_wait_for",
-  "parameters": {
-    "scanIds": "12345",
-    "--while": "status=Running",
-    "--timeout": "7200"
+    "--until": "any-match",
+    "--while": "any-match",
+    "--any-state": "Failed",
+    "--timeout": "2h"
   }
 }
 ```
 
 **Parameters:**
-- `--until`: Continue until condition becomes true
-- `--while`: Continue while condition remains true
-- `--timeout`: Maximum wait time in seconds (7200 = 2 hours)
-
-**Behavior:**
-- Tool polls scan status periodically
-- Returns when condition met or timeout reached
-- Useful for automation and CI/CD pipelines
+- `--until`: `"any-match"` or `"all-match"` — wait **until** scans reach the target state
+- `--while`: `"any-match"` or `"all-match"` — required by MCP schema (mutually exclusive with `--until` in the CLI)
+- `--any-state`: Target state value (e.g., `"Complete"`, `"Failed"`, `"Running"`)
+- `--timeout`: Maximum wait time (e.g., `"1h"`, `"2h"`)
 
 ---
 
@@ -253,7 +271,7 @@ Detailed information including:
 **Parameters:**
 ```json
 {
-  "scanIds": "12345"
+  "scanId": "12345"
 }
 ```
 
@@ -283,7 +301,7 @@ Detailed information including:
 **Parameters:**
 ```json
 {
-  "scanIds": "12345"
+  "scanId": "12345"
 }
 ```
 
@@ -308,44 +326,43 @@ Detailed information including:
     "step": "1. List all running scans",
     "tool": "fcli_sc_dast_scan_list",
     "parameters": {
-      "--server-queries": "status=Running"
+      "query": { "scanStatusTypeDescription": "Running" }
     }
   },
   {
     "step": "2. Get details of specific scan",
     "tool": "fcli_sc_dast_scan_get",
     "parameters": {
-      "scanIds": "12345"
+      "scanId": "12345"
     }
   },
   {
     "step": "3. Pause scan for maintenance",
     "tool": "fcli_sc_dast_scan_pause",
     "parameters": {
-      "scanIds": "12345"
+      "scanId": "12345"
     }
   },
   {
     "step": "4. Verify paused",
     "tool": "fcli_sc_dast_scan_get",
     "parameters": {
-      "scanIds": "12345"
+      "scanId": "12345"
     }
   },
   {
     "step": "5. Resume after maintenance",
     "tool": "fcli_sc_dast_scan_resume",
     "parameters": {
-      "scanIds": "12345"
+      "scanId": "12345"
     }
   },
   {
     "step": "6. Monitor until complete",
-    "tool": "fcli_sc_dast_scan_wait_for",
+    "comment": "Recommended: poll scan_get until scanStatusTypeDescription is Complete or Failed",
+    "tool": "fcli_sc_dast_scan_get",
     "parameters": {
-      "scanIds": "12345",
-      "--until": "status=Complete",
-      "--timeout": "7200"
+      "scanId": "12345"
     }
   }
 ]
@@ -421,7 +438,7 @@ When listing many scans, you may encounter pagination with `totalRecords: null`:
 **Cause:** Filter criteria too restrictive or no matching scans  
 **Solution:**
 1. Try without filters to see all scans
-2. Verify filter syntax (e.g., `status=Running` not `status:Running`)
+2. Use `query.scanStatusTypeDescription` for status filtering (e.g., `"query": { "scanStatusTypeDescription": "Running" }`) — `--server-queries "status=X"` does not work
 3. Check for typos in scan names
 
 ### Pagination returns empty results
@@ -486,14 +503,14 @@ Use consistent naming conventions and filter by name:
 
 **DO:**
 - ✅ Use server-side filtering (`--server-queries`) for better performance
-- ✅ Use `scan_wait_for` instead of manual polling
+- ✅ Use `scan_get` polling to monitor scan progress (reliable MCP method)
 - ✅ Set realistic timeouts (DAST scans take 30min-2hrs typically)
 - ✅ Use pause/resume for maintenance windows
 - ✅ Monitor failed scans regularly
 - ✅ Use descriptive scan names for easy filtering
 
 **DO NOT:**
-- ❌ Poll status manually when `scan_wait_for` is available
+- ❌ Rely on `scan_wait_for` via MCP — it may return exitCode 2 due to a schema bug (use `scan_get` polling instead)
 - ❌ Use client-side filtering for large datasets
 - ❌ Pause scans unnecessarily (affects completion time)
 - ❌ Set very short timeouts for `scan_wait_for`
