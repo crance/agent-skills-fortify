@@ -1,6 +1,13 @@
 # Running SAST Scans
 **Prerequisites:** Authentication verified (see SKILL.md)
 
+## Contents
+- [Use Case](#use-case)
+- [Workflow Steps](#workflow-steps)
+- [Complete Example Flow](#complete-example-flow)
+- [Troubleshooting](#troubleshooting)
+- [Key Differences from SCA Scans](#key-differences-from-sca-scans)
+
 ## Use Case
 You need to run a Static Application Security Testing (SAST) scan to analyze source code for security vulnerabilities.
 
@@ -10,7 +17,7 @@ You need to run a Static Application Security Testing (SAST) scan to analyze sou
 First, identify the release to scan. If uncertain, see [Finding Releases](find-release.md).
 
 ```tool
-fcli_fod_release_get --qualifiedReleaseNameOrId "MyApp:MyRelease"
+fcli_fod_release_get qualifiedReleaseNameOrId "MyApp:MyRelease"
 ```
 **Expected**: Release details including ID and available assessment types
 
@@ -31,11 +38,12 @@ fcli_fod_sast_scan_get_config --release "MyApp:MyRelease"
 
 ### Step 3 - Configure Scan Settings (If Not Already Configured)
 If Step 2 shows no configuration, **ask the user** for the following information:
-- **Language** (e.g., Java, C#, Python, JavaScript, Go)
-- **Build Tool** (e.g., Maven, Gradle, MSBuild, npm, pip)
-- **Framework** (e.g., Spring Boot, .NET Core, Django, React)
+- **Technology Stack** (e.g., Java/J2EE, Python, JavaScript, .NET / C#)
+- **Language Level** (e.g., `1.8` for Java 8, `3.9` for Python 3.9 — optional)
 - **Source Code Location** (which directories to include/exclude)
 - **Assessment Type** (e.g., Static Assessment, Static Assessment+)
+- **Entitlement Frequency** (`Subscription` or `SingleScan`)
+- **Audit Preference** (`Automated` or `Manual`)
 - **Open Source Analysis** (whether to include OSS/SCA scanning in this SAST scan)
 
 **Never infer these settings from the workspace** - always prompt the user.
@@ -45,14 +53,23 @@ Once you have the information, configure the scan:
 ```tool
 fcli_fod_sast_scan_setup 
   --release "MyApp:MyRelease"
-  language "Java"
-  build-tool "Maven"
-  framework "Spring Boot"
-  assessment-type "Static Assessment"
+  --technology-stack "Java/J2EE"
+  --language-level "1.8"
+  --assessment-type "Static Assessment"
+  --entitlement-frequency "Subscription"
+  --audit-preference "Automated"
   --oss
 ```
 
+**Required Parameters**:
+- `--release`: Release identifier (e.g., `"MyApp:MyRelease"`)
+- `--assessment-type`: Assessment type (e.g., `"Static Assessment"`, `"Static Assessment+"`)
+- `--entitlement-frequency`: Entitlement frequency — `"Subscription"` or `"SingleScan"`
+- `--audit-preference`: Audit preference — `"Automated"` or `"Manual"`
+
 **Optional Parameters**:
+- `--technology-stack`: Technology stack (e.g., `"Java/J2EE"`, `"Python"`, `"JavaScript"`, `".NET / C#"`)
+- `--language-level`: Language/framework version (e.g., `"1.8"` for Java 8, `"3.9"` for Python 3.9)
 - `--oss`: Enable Open Source Analysis (boolean flag) - includes SCA/OSS scanning in the SAST scan
 
 **Expected**: Confirmation that scan settings are configured
@@ -64,19 +81,24 @@ Package the application source code for upload:
 
 ```tool
 fcli_fod_action_package 
-  output-file "sast-package.zip"
-  include "src/**"
-  exclude "test/**,*.log,node_modules/**"
+  --output "sast-package.zip"
+  --source-dir "."
+  --sc-client-version "auto"
+  --rel "MyApp:MyRelease"
 ```
 
 **Parameters**:
-- `output-file`: Path for the generated zip file
-- `include`: Glob patterns for files to include
-- `exclude`: Glob patterns for files to exclude (optional)
+- `--output`: Path for the generated zip file
+- `--source-dir`: Root directory of the source code to package
+- `--sc-client-version`: ScanCentral client version to use (use `"auto"` to auto-detect)
+- `--rel`: Release identifier (e.g., `"MyApp:MyRelease"`) — required in practice even though listed as optional
+- `--extra-opts`: Additional ScanCentral client options (e.g., `-bt none` for no build tool)
 
 **Expected**: Package file created (e.g., `sast-package.zip`)
 
-**Note**: Ask the user which directories to include/exclude if uncertain.
+> ⚠️ **FCLI Bug**: The action script unconditionally evaluates `package.ossEnabled` to determine OSS flags. If `--rel` is omitted or no FoD session is active, the action crashes with a SpEL null-reference error. Always supply `--rel` and ensure an active FoD session.
+
+**Note**: Ask the user which source directory to use if uncertain.
 
 ---
 
@@ -86,7 +108,7 @@ Upload the packaged source code and initiate the SAST scan:
 ```tool
 fcli_fod_sast_scan_start 
   --release "MyApp:MyRelease"
-  file "sast-package.zip"
+  --file "sast-package.zip"
 ```
 
 **Expected**: Scan initiated with scan ID returned
@@ -105,19 +127,40 @@ Example response:
 ### Step 6 - Monitor Scan Progress
 Monitor the scan until completion. **Use the scan ID returned from Step 5.** You can either:
 
-**Option A: Wait for completion (blocking)**
-```tool
-fcli_fod_sast_scan_wait_for 
-  scan-id "12345"
-  until "COMPLETED"
-  timeout "3600"
+#### Option A: Blocking Wait
+
+**Tool:** `fcli_fod_sast_scan_wait_for`
+
+```json
+{
+  "releaseQualifiedScanOrIds": "1391852:18001127",
+  "--until": "all-match",
+  "--while": "any-match",
+  "--any-state": "Completed",
+  "--timeout": "1h"
+}
 ```
 
-**Option B: Check status periodically (non-blocking)**
-```tool
-fcli_fod_sast_scan_get releaseQualifiedScanOrId "12345"
+**Parameter Details:**
+- `releaseQualifiedScanOrIds` (**required**): Use `<release-id>:<scan-id>` from `releaseAndScanId` field of `sast_scan_start` response
+- `--until` (**required by MCP schema**): `"any-match"` or `"all-match"` — NOT a state name
+- `--while` (**required by MCP schema**): `"any-match"` or `"all-match"`
+- `--any-state`: Scan state to wait for (`Completed`, `Canceled`)
+- `--timeout`: Maximum wait time with unit suffix (e.g., `"30m"`, `"1h"`)
+
+> ⚠️ **MCP Schema Warning:** The MCP schema requires both `--until` AND `--while` simultaneously, but these are mutually exclusive options in the actual FCLI CLI. As a result, calls through the MCP tool may consistently return `exitCode: 2` with no output. **If this occurs, fall back to Option B (polling).**
+
+#### Option B: Polling (Recommended for MCP usage)
+
+**Tool:** `fcli_fod_sast_scan_get`
+
+```json
+{
+  "releaseQualifiedScanOrId": "1391852:18001127"
+}
 ```
-> **Note**: The parameter name is `releaseQualifiedScanOrId`, and you must provide the **scan ID** (e.g., `"12345"`), not the release name. Get the scan ID from the `scan_start` response in Step 5.
+
+Poll every 60–120 seconds until `analysisStatusType` is `Completed`.
 
 **Scan Status Values**:
 - `Queued` → Waiting to start
@@ -136,7 +179,7 @@ Once the scan completes, list the vulnerabilities found:
 fcli_fod_issue_list 
   --release "MyApp:MyRelease"
   --embed "details,recommendations"
-  --filters-param "severityString:Critical"
+  query {"severity": "Critical"}
 ```
 
 **Expected**: List of security vulnerabilities with details and recommendations
@@ -154,7 +197,7 @@ For remediation guidance, see [Remediation Workflow](remediation-workflow.md).
 fcli_fod_session_list refresh-cache=true
 
 # 2. Get release details
-fcli_fod_release_get --qualifiedReleaseNameOrId "MyApp:MyRelease"
+fcli_fod_release_get qualifiedReleaseNameOrId "MyApp:MyRelease"
 
 # 3. Check existing configuration
 fcli_fod_sast_scan_get_config --release "MyApp:MyRelease"
@@ -173,15 +216,19 @@ fcli_fod_action_package
 # 6. Start scan
 fcli_fod_sast_scan_start 
   --release "MyApp:MyRelease"
-  file "sast-package.zip"
+  --file "sast-package.zip"
 
-# 7. Wait for completion
-fcli_fod_sast_scan_wait_for scan-id "12345" until "COMPLETED"
+# 7. Poll until completed (recommended for MCP)
+fcli_fod_sast_scan_get releaseQualifiedScanOrId "<release-id>:<scan-id>"
+# Repeat every 60-120s until analysisStatusType = "Completed"
+# Alternative (may return exitCode 2 via MCP due to schema constraints):
+# fcli_fod_sast_scan_wait_for releaseQualifiedScanOrIds "<release-id>:<scan-id>" --until "all-match" --while "any-match" --any-state "Completed" --timeout "1h"
 
 # 8. View results
 fcli_fod_issue_list 
   --release "MyApp:MyRelease"
   --embed "details"
+  query {"severity": "Critical"}
 ```
 
 ---

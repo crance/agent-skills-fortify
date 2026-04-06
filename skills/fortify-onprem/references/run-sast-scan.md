@@ -12,6 +12,14 @@ run scan, SAST, package, upload, start scan, monitor progress, scan my code, pac
 - Source code directory accessible
 - ScanCentral sensors available with matching version
 
+## Contents
+- [Complete Workflow](#complete-workflow)
+- [Alternative: Download FPR File](#alternative-download-fpr-file)
+- [Error Handling](#error-handling)
+- [Complete Example Flow](#complete-example-flow)
+- [Tips and Best Practices](#tips-and-best-practices)
+- [Troubleshooting Version Mismatches](#troubleshooting-version-mismatches)
+
 ## Complete Workflow
 
 ### Step 1: Verify Authentication
@@ -132,7 +140,7 @@ Example response:
 ### Step 5: Monitor Scan Progress
 Choose one of two monitoring approaches:
 
-#### Option A: Blocking Wait (Recommended for immediate results)
+#### Option A: Blocking Wait
 Wait for scan to complete with timeout:
 
 **Tool:** `fcli_sc_sast_scan_wait_for`
@@ -141,25 +149,33 @@ Wait for scan to complete with timeout:
 ```json
 {
   "scanJobTokens": "550e8400-e29b-41d4-a716-446655440000",
-  "--until": "COMPLETED",
-  "--timeout": "3600"
+  "--until": "any-match",
+  "--while": "any-match",
+  "--any-scan-state": "COMPLETED",
+  "--any-publish-state": "COMPLETED",
+  "--any-ssc-state": "PROCESS_COMPLETE",
+  "--timeout": "1h"
 }
 ```
 
 **Parameter Details:**
 - `scanJobTokens` (**required**): The UUID from Step 4 output
-- `--until` (**required**): Target state ("COMPLETED", "PUBLISHED", or "FAILED")
-- `--timeout` (**required**): Maximum wait time in seconds (3600 = 1 hour)
+- `--until` (**required by MCP schema**): `"any-match"` or `"all-match"` — NOT a state name
+- `--while` (**required by MCP schema**): `"any-match"` or `"all-match"`
+- `--any-scan-state`: Scan-level state to match (`COMPLETED`, `PUBLISHED`, `FAILED`)
+- `--any-publish-state`: Publish-level state to match (`COMPLETED`, `FAILED`)
+- `--any-ssc-state`: SSC artifact state to match (`PROCESS_COMPLETE`, `ANALYSIS_COMPLETE`)
+- `--timeout` (**required**): Maximum wait time (e.g., `"30m"`, `"1h"`, `"2h"`)
 
-**Expected output:** Scan reaches target state or timeout occurs
+> ⚠️ **MCP Schema Warning:** The MCP schema for `scan_wait_for` requires both `--until` AND `--while` simultaneously, but these are mutually exclusive options in the actual FCLI CLI. As a result, calls through the MCP tool may consistently return `exitCode: 2` with no output. **If this occurs, fall back to Option B (polling).**
 
 **Timing guidance:**
 - Small projects: 5-15 minutes
 - Medium projects: 15-30 minutes
 - Large projects: 30-60 minutes
-- Set timeout conservatively (recommend 3600 seconds)
+- Set timeout conservatively (recommend 1h)
 
-#### Option B: Polling (For async monitoring)
+#### Option B: Polling (Recommended for MCP usage)
 Periodically check scan status:
 
 **Tool:** `fcli_sc_sast_scan_status`
@@ -189,13 +205,13 @@ After scan completes and publishes, view issues in SSC:
 ```json
 {
   "--appversion": "MyApp:1.0",
-  "--embed": "details,recommendations"
+  "--embed": "details"
 }
 ```
 
 **Parameter Details:**
 - `--appversion` (**required**): Same value used in `--publish-to` (Step 4)
-- `--embed` (optional): Include additional details (details, recommendations, audits, etc.)
+- `--embed` (optional): Include additional details; allowed values: `details`, `comments`, `auditHistory`
 - `--filter` (optional): Server-side filtering (e.g., `FILTER[severity]:Critical,High`)
 
 **Expected output:** List of security issues found in the scan
@@ -204,7 +220,7 @@ After scan completes and publishes, view issues in SSC:
 ```json
 {
   "--appversion": "MyApp:1.0",
-  "--embed": "details,recommendations",
+  "--embed": "details",
   "--filter": "FILTER[severity]:Critical"
 }
 ```
@@ -218,7 +234,8 @@ If you need the raw FPR file instead of SSC issues:
 ```json
 {
   "scanJobToken": "550e8400-e29b-41d4-a716-446655440000",
-  "--fpr": "output.fpr"
+  "--type": "fpr",
+  "--file": "output.fpr"
 }
 ```
 
@@ -244,7 +261,7 @@ Recovery: Verify source directory contains buildable code, check for build.gradl
 ### Scan Failures
 ```
 Error: Scan failed during analysis
-Recovery: Download scan logs with scan_download --log, check for build issues or analysis errors
+Recovery: Download scan logs with scan_download --type log --file scan.log, check for build issues or analysis errors
 ```
 
 ### Publish Failures
@@ -299,14 +316,29 @@ Recovery: Verify SSC application version exists, check connectivity, review SSC 
 
 **Output:** `{"scanJobToken": "abc123...", "status": "QUEUED"}`
 
-**5. Wait for completion:**
+**5. Wait for completion (polling — recommended for MCP):**
+```json
+{
+  "tool": "fcli_sc_sast_scan_status",
+  "parameters": {
+    "scanJobToken": "abc123..."
+  }
+}
+```
+Poll every 60–120 seconds until `scanState` is `COMPLETED` or `PUBLISHED`.
+
+**Alternative (scan_wait_for — may return exitCode 2 via MCP due to schema constraints):**
 ```json
 {
   "tool": "fcli_sc_sast_scan_wait_for",
   "parameters": {
     "scanJobTokens": "abc123...",
-    "--until": "COMPLETED",
-    "--timeout": "3600"
+    "--until": "any-match",
+    "--while": "any-match",
+    "--any-scan-state": "COMPLETED",
+    "--any-publish-state": "COMPLETED",
+    "--any-ssc-state": "PROCESS_COMPLETE",
+    "--timeout": "1h"
   }
 }
 ```
@@ -317,7 +349,7 @@ Recovery: Verify SSC application version exists, check connectivity, review SSC 
   "tool": "fcli_ssc_issue_list",
   "parameters": {
     "--appversion": "WebApp:main",
-    "--embed": "details,recommendations",
+    "--embed": "details",
     "--filter": "FILTER[severity]:Critical,High"
   }
 }
@@ -339,7 +371,7 @@ Recovery: Verify SSC application version exists, check connectivity, review SSC 
 
 7. **Results timing**: Don't query SSC issues until scan reaches COMPLETED or PUBLISHED state
 
-8. **Error logs**: If scan fails, download logs using `scan_download` with `log` parameter for troubleshooting
+8. **Error logs**: If scan fails, download logs using `scan_download` with `--type log` (and optionally `--file scan.log`) for troubleshooting
 
 ## Troubleshooting Version Mismatches
 
@@ -433,7 +465,6 @@ Look for the `sensorVersion` field in the output:
 {
   "tool": "fcli_sc_sast_scan_list",
   "parameters": {
-    "embed": "scSastScan",
     "limit": 5
   }
 }

@@ -1,6 +1,11 @@
 # Summarise and count issues
 **Prerequisites:** Authentication verified (see SKILL.md)
 
+## Contents
+- [Use Case](#use-case)
+- [Workflow Steps](#workflow-steps)
+- [Report Template](#report-template)
+
 ## Use Case
 Generate a summary report showing issue distribution by severity (Critical, High, Medium, Low) and by vulnerability category (SQL Injection, XSS, etc.) for management review.
 

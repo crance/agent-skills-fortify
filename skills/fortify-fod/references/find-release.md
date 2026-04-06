@@ -1,6 +1,19 @@
 # Finding Applications and Releases
 **Prerequisites:** Authentication verified (see SKILL.md)
 
+## Contents
+- [Use Case](#use-case)
+- [Workflow Steps](#workflow-steps)
+- [Complete Example Flow](#complete-example-flow)
+- [Understanding Release Identifiers](#understanding-release-identifiers)
+- [Common Search Patterns](#common-search-patterns)
+- [Getting Application Details](#getting-application-details)
+- [List Assessment Types for Release](#list-assessment-types-for-release)
+- [List Scans for Application or Release](#list-scans-for-application-or-release)
+- [Troubleshooting](#troubleshooting)
+- [Best Practices](#best-practices)
+- [Related Workflows](#related-workflows)
+
 ## Use Case
 You need to find the correct application and release when the exact name is uncertain or when exploring available options.
 
@@ -10,7 +23,7 @@ You need to find the correct application and release when the exact name is unce
 If you know the exact release identifier, try getting it directly:
 
 ```tool
-fcli_fod_release_get --qualifiedReleaseNameOrId "MyApp:MyRelease"
+fcli_fod_release_get qualifiedReleaseNameOrId "MyApp:MyRelease"
 ```
 
 **Expected**: Release details with ID
@@ -145,12 +158,12 @@ When a query returns multiple matches:
 Once the user confirms the correct release, retrieve full details:
 
 ```tool
-fcli_fod_release_get --qualifiedReleaseNameOrId "MyApp:MyRelease-v2"
+fcli_fod_release_get qualifiedReleaseNameOrId "MyApp:MyRelease-v2"
 ```
 
 **Or use the release ID directly:**
 ```tool
-fcli_fod_release_get --qualifiedReleaseNameOrId "10023"
+fcli_fod_release_get qualifiedReleaseNameOrId "10023"
 ```
 
 **Expected**: Complete release information including:
@@ -169,7 +182,7 @@ fcli_fod_release_get --qualifiedReleaseNameOrId "10023"
 fcli_fod_session_list refresh-cache=true
 
 # 2. Try direct lookup first
-fcli_fod_release_get --qualifiedReleaseNameOrId "MyApp:MyRelease"
+fcli_fod_release_get qualifiedReleaseNameOrId "MyApp:MyRelease"
 
 # 3. If not found, list all applications
 fcli_fod_app_list
@@ -181,7 +194,7 @@ fcli_fod_app_list query { "applicationName": ".*MyApp.*" }
 fcli_fod_release_list query { "applicationName": "MyApp" }
 
 # 6. Get specific release details
-fcli_fod_release_get --qualifiedReleaseNameOrId "MyApp:MyRelease-v2"
+fcli_fod_release_get qualifiedReleaseNameOrId "MyApp:MyRelease-v2"
 ```
 
 ---
@@ -249,12 +262,12 @@ fcli_fod_release_list
 If you need more information about an application:
 
 ```tool
-fcli_fod_app_get app-name-or-id "MyApp"
+fcli_fod_app_get appNameOrId "MyApp"
 ```
 
 **Or by ID:**
 ```tool
-fcli_fod_app_get app-name-or-id "5011"
+fcli_fod_app_get appNameOrId "5011"
 ```
 
 **Expected**: Detailed application information including:

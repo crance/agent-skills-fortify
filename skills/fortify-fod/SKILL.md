@@ -18,44 +18,14 @@ Fortify on Demand (FoD) integration via Model Context Protocol (MCP).
 - Manage scan configurations and monitor scan progress
 - Generate and download security reports
 
-## Available MCP Tools
-Only key MCP tools for FoD are listed here.
-| Tool | Description | When to Use |
-|-----------|-------------|-------------|
-| `fcli_fod_session_list` | List authentication sessions | Check authentication status |
-| `fcli_fod_app_list` | List applications | Discover available applications |
-| `fcli_fod_app_get` | Get details of a specific application | Retrieve detailed information about an application |
-| `fcli_fod_release_list` | List releases | Discover available releases |
-| `fcli_fod_release_get` | Get details of a specific release | Retrieve detailed information about a release |
-| `fcli_fod_release_list_assessment_types` | List available scan types for release | Discover which scan types are available |
-| `fcli_fod_issue_list` | List issues/vulnerabilities | Retrieve security findings |
-| `fcli_fod_issue_update` | Update vulnerability status | Change analysis tags, add comments, suppress issues |
-| `fcli_fod_action_package` | Package source code for scanning | Prepare source code for SAST/SCA scans |
-| `fcli_fod_sast_scan_setup` | Configure SAST scan settings | Set up static analysis scan parameters |
-| `fcli_fod_sast_scan_start` | Start SAST scan | Upload package and initiate static scan |
-| `fcli_fod_sast_scan_get_config` | Get SAST scan configuration | Retrieve current SAST scan settings (uses release name) |
-| `fcli_fod_sast_scan_get` | Get SAST scan details by scan ID | Check specific scan status (requires scan ID from start response or scan list) |
-| `fcli_fod_sast_scan_wait_for` | Wait for SAST scan completion | Monitor scan until finished |
-| `fcli_fod_oss_scan_start` | Start SCA/OSS scan | Upload package and initiate open source scan |
-| `fcli_fod_oss_scan_get` | Get SCA scan details by scan ID | Check specific SCA scan status (requires scan ID from start response or scan list) |
-| `fcli_fod_oss_scan_list_components` | List detected open source components | View OSS components found in scan |
-| `fcli_fod_dast_scan_setup_website` | Configure website DAST scan | Set up dynamic analysis for web apps |
-| `fcli_fod_dast_scan_setup_api` | Configure API DAST scan | Set up dynamic analysis for APIs |
-| `fcli_fod_dast_scan_get_config` | Get DAST scan configuration | Retrieve current DAST scan settings (uses release name) |
-| `fcli_fod_dast_scan_start` | Start DAST scan | Initiate dynamic security scan |
-| `fcli_fod_report_create` | Create security report | Generate reports from scan results |
-| `fcli_fod_report_download` | Download report file | Retrieve generated report |
-| `fcli_fod_report_wait_for` | Wait for report generation | Monitor report creation until complete |
-
 ## Parameter Formats
 Common formats and examples for key parameters:
 | Parameter | Format | Example |
 |-----------|-------------|-------------|
-| `--fod-session` | Session name (REQUIRED for all tools) | `"default"` |
-| `--release` | `"<App>:<Release>"` - case-sensitive, colon-separated (for `*_list`, `*_scan_setup`, `*_scan_start`, `*_scan_get_config` tools) |  `"MyApp:MyRelease"` |
-| `--qualifiedReleaseNameOrId` | `"<App>:<Release>"` - case-sensitive, colon-separated (for `release_get`, `app_get` tools) |  `"MyApp:MyRelease"` |
+| `--release` | `"<App>[:<MicroService>]:<Release>"` - case-sensitive, colon-separated (for `*_list`, `*_scan_setup`, `*_scan_start`, `*_scan_get_config` tools) |  `"MyApp:MyRelease"` or `"MyApp:MyService:MyRelease"` |
+| `qualifiedReleaseNameOrId` | `"<App>[:<MicroService>]:<Release>"` - positional param, case-sensitive, colon-separated (for `release_get` tool) |  `"MyApp:MyRelease"` or `"MyApp:MyService:MyRelease"` |
+| `appNameOrId` | Application name or ID - positional param, camelCase (for `app_get` tool) | `"MyApp"` or `"5011"` |
 | `releaseQualifiedScanOrId` | Scan ID or qualified scan ID (for `*_scan_get` tools) - **Always use scan ID returned from `*_scan_start` or from `*_scan_list`** | `"12345"` or `"MyApp:MyRelease:12345"` |
-| `--filters-param` | `"<FilterName>:<Value>"` - server-side filtering | `"severityString:Critical"` |
 | `--include` | Control which issue statuses to include. By default, only `visible` issues returned. Comma-separated values: `visible`, `fixed`, `suppressed` | `"visible,fixed"` or `"suppressed"` |
 | `--embed` | Comma-separated values to include additional data. Valid values: `allData`, `summary`, `details`, `recommendations`, `history`, `requestResponse`, `headers`, `parameters`, `traces` | `"details,recommendations,history"` |
 | `file` | Path to packaged zip or report output | `"package.zip"`, `"report.pdf"` |
@@ -89,10 +59,11 @@ Before starting any scan, follow this sequence:
 - **MAST scans**: Upload mobile app binary (APK/IPA file)
 - **Note**: To enable Open Source Analysis in a SAST scan, use `--oss` flag in `fcli_fod_sast_scan_setup`
 
-### Filtering: Prefer --filters-param for Server-Side
-- **Prefer `--filters-param`** for server-side filtering (fastest, smallest payloads)
-- **Optionally use `query`** as a client-side post-filter when you need a simple match on returned fields
-- Common filters: `severityString:Critical`, `severityString:High`, `category:SQL Injection`
+### Filtering: Use `query` for Client-Side, `--include` for Status
+- **Use `query`** for client-side filtering by valid fields: `category`, `foundInReleases`, `instanceId`, `location`, `severity`, `visibilityMarker`
+- **Use `--include`** to control issue status visibility: `visible` (default), `fixed`, `suppressed`
+- **`--filters-param` does NOT exist** — do not use it; it will fail
+- Common examples: `query {"severity": "Critical"}`, `query {"category": "SQL Injection"}`, `--include "suppressed"`
 
 ### Pagination
 - If `pagination.hasMore` = true → use `pagination-offset` for next page
@@ -112,9 +83,9 @@ Before starting any scan, follow this sequence:
 |-------|----------|
 | "run SAST scan" / "static analysis" | Check config → ask settings → package → `sast_scan_start` (see [SAST Workflow](references/run-sast-scan.md)) |
 | "run SCA scan" / "open source scan" | Package → `oss_scan_start` (see [SCA Workflow](references/run-sca-scan.md)) |
-| "run DAST scan" / "dynamic scan" | Check config → ask settings → `dast_scan_start` (see [DAST Workflow](references/run-dast-scan.md)) |
-| "list/show vulnerabilities" | `issue_list` with `--filters-param` + `--embed details,recommendations` |
-| "how many / count / summary" | `issue_list` and aggregate results client-side |
+| "run DAST scan" / "dynamic scan" | **DAST Automated only** — `setup-website/api/workflow` only support automated DAST types; manually-conducted Dynamic Assessments cannot be configured via MCP. Check config → ask settings → `dast_scan_start` (see [DAST Workflow](references/run-dast-scan.md)) |
+| "list/show vulnerabilities" | `issue_list` with `query {"severity": "Critical"}` + `--embed details,recommendations` — see [List and Filter Vulnerabilities](references/list-filter-vulnerabilities.md) |
+| "how many / count / summary" | `issue_list` and aggregate results client-side — see [Vulnerability Summary](references/vulnerability-summary.md) |
 | "find release / which release" | `release_list` → `release_get` (see [Finding Releases](references/find-release.md)) |
 | "show recommendations / how to fix" | `issue_list` with `--embed recommendations,history` → prioritize Aviator (see [Remediation](references/remediation-workflow.md)) |
 
@@ -124,7 +95,8 @@ Before starting any scan, follow this sequence:
 - ✅ Check scan configuration before starting SAST scans
 - ✅ Always ask user for SAST scan settings (language, build tool, framework)
 - ✅ Use `--oss` flag in `sast_scan_setup` to enable Open Source Analysis in SAST scans
-- ✅ Use `--filters-param` for server-side filtering
+- ✅ Use `query` for client-side filtering (valid fields: `severity`, `category`, `location`, `instanceId`, `foundInReleases`, `visibilityMarker`)
+- ✅ Use `--include "suppressed"` or `--include "fixed"` to retrieve non-default issue statuses
 - ✅ Use `--embed` to include details, recommendations, and history
 - ✅ Prioritize Fortify Aviator code fix suggestions in remediation
 - ✅ Use MCP tools over FCLI CLI directly
@@ -137,6 +109,7 @@ Before starting any scan, follow this sequence:
 - ❌ Prompt user for credentials - ask user to run `fcli fod session login` locally
 - ❌ Start scans without confirming settings with user
 - ❌ Package source code for DAST scans (not needed)
+- ❌ Use `dast_scan_setup_*` for non-automated (manually-conducted) DAST assessments — only **DAST Automated** assessment types are supported
 
 ## References
 ### Example Workflows

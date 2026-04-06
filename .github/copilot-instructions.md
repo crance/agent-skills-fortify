@@ -17,7 +17,7 @@ The MCP tools are accessed via FCLI, which is the command-line interface for For
 
 ### Design Principles
 1. **Self-contained skills** - Each skill must work independently with no dependencies on other skills
-2. **One skill per MCP module** - Mirrors FCLI's MCP architecture (`fcli-ssc`, `fcli-fod`, `fcli-sc-sast`, `fcli-sc-dast`)
+2. **One skill per deployment model** - `fortify-onprem` covers all on-prem products (SSC + SC-SAST + SC-DAST); `fortify-fod` covers SaaS
 3. **Accept necessary duplication** - Small duplication is acceptable for reliability
 4. **Progressive disclosure** - Put detailed workflows, scripts, etc in `references/` folder, referenced from SKILL.md
 
@@ -25,121 +25,28 @@ The MCP tools are accessed via FCLI, which is the command-line interface for For
 ```
 skills/
 ├── fortify-fod/
-│   ├── SKILL.md
-│   └── references/
-├── fortify-ssc/
 │   ├── SKILL.md              # Main skill file (loaded when skill activated)
 │   └── references/           # Detailed workflows (loaded on-demand)
-│       ├── README.md
 │       └── *.md
-├── fortify-scsast/
-│   └── SKILL.md
-└── fortify-scdast/
-    └── SKILL.md
+└── fortify-onprem/
+    ├── SKILL.md              # Combined On-Prem skill (SSC + SC-SAST + SC-DAST)
+    └── references/           # Detailed workflows (loaded on-demand)
+        └── *.md
 ```
-
-### Loading Behavior
-| Component | When Loaded | Context Impact |
-|-----------|-------------|----------------|
-| `SKILL.md` | Skill activation | Immediate - keep concise |
-| `references/*.md` | On-demand | LLM fetches when relevant |
 
 ### Optimizing Examples for Progressive Disclosure
 
-The LLM decides to fetch examples based on **keyword matching** between user requests and reference text. To maximize progressive disclosure effectiveness:
-
-**1. In SKILL.md - Use keyword-rich example references:**
-```markdown
-## Example Workflows
-| Workflow | Use When User Says... |
-|----------|----------------------|
-| [upload-workflow.md](./references/upload-workflow.md) | "upload FPR", "import scan", "submit artifact", "upload results" |
-| [filter-issues.md](./references/filter-issues.md) | "filter by severity", "show critical", "find high priority" |
-```
-
-**2. In each example file - Start with clear use case:**
-```markdown
-# Upload Scan Workflow
-
-## Use Case
-Upload FPR or SCA scan results to SSC for analysis.
-
-## Keywords (more keywords = better matching = smarter progressive loading)
-upload, FPR, artifact, SCA, import, scan results
-```
+The LLM decides to fetch examples based on **keyword matching** between user requests and reference text. In `SKILL.md`, use a keyword-rich references table with a "Use When User Says..." column. In each reference file, open with a `## Use Case` section and a `## Keywords` line listing relevant terms.
 
 ---
 
 ## SKILL.md Template Structure
 
-Each skill file should follow this consistent structure with product-specific content:
+See existing skill files as canonical examples of the required structure:
+- `skills/fortify-fod/SKILL.md` — FoD (SaaS) skill
+- `skills/fortify-onprem/SKILL.md` — combined On-Prem skill (SSC + SC-SAST + SC-DAST)
 
-```markdown
----
-name: fortify-{product}
-description: {Product} guide for MCP tools. {Brief description of product and capabilities}.
-metadata:
-  version: "0.0.1"
----
-
-# Fortify {Product} Skill
-Fortify {Product} ({Product Acronym}) integration via Model Context Protocol (MCP).
-
-## Available MCP Tools
-Only key MCP tools for {product} are listed here.
-| Tool | Description | When to Use |
-|-----------|-------------|-------------|
-| `fcli_{product}_...` | ... | ... |
-
-## Parameter Formats
-| Parameter | Format | Example |
-|-----------|--------|---------|
-| ... | ... | ... |
-
-## Authentication
-Product-specific session check and login instructions.
-- Session check tool
-- What to do if expired
-- Login command syntax (for user to run locally)
-
-## Filtering
-- Filtering preference, server-side filter is preferred
-- Other filtering approach, such as client-side
-
-## Pagination (if applicable)
-How to handle large result sets, jobToken, pagination-offset.
-
-## Error Recovery
-| Error | Recovery |
-|-------|----------|
-| "Session expired" | Ask user to run `fcli {product} session login` locally |
-| ... | ... |
-
-## Decision Tree: Choosing the Right Approach
-| User Intent | Action |
-|-------|----------|
-| "list/show vulnerabilities" | `issue_list` with `--filter` + `--embed details` |
-| ... | ... |
-
-## Best Practices
-**DO:**
-- ✅ ...
-- ✅ ...
-
-**Do NOT:**
-- ❌ ...
-- ❌ ...
-
-
-## References
-#### Example Workflows
-| Workflow | Use When User Says... |
-|----------|----------------------|
-| [Provide Recommendations](references/provide-recommendations.md) | "show recommendations", "provide remediation advice", "how to fix" |
-| ... |-=...|
-### External Resources
-- [FCLI Documentation](https://fortify.github.io/fcli/)
-```
+Required sections in every skill: YAML frontmatter (`name`, `description`, `metadata.version`), Available MCP Tools, Parameter Formats, Authentication, Filtering, Error Recovery, Decision Tree, Best Practices, References (workflows table + external links).
 
 ---
 
@@ -149,8 +56,8 @@ How to handle large result sets, jobToken, pagination-offset.
 | Product | Session Check | Login Command |
 |---------|---------------|---------------|
 | SSC | `fcli_ssc_session_list` | `fcli ssc session login --url <URL> -u <user> -p <pass>` |
-| SC-SAST | `fcli_ssc_session_list` | `fcli ssc session login --ssc-url <URL> -u <user> -p <pass> --sc-sast-url <URL> --client-auth-token <token>`  |
-| SC-DAST | `fcli_ssc_session_list` | `fcli ssc session login --ssc-url <URL> -u <user> -p <pass>` |
+| SC-SAST | `fcli_ssc_session_list` | `fcli ssc session login --url <URL> -u <user> -p <pass> --sc-sast-url <SC-SAST-URL> --client-auth-token <token>`  |
+| SC-DAST | `fcli_ssc_session_list` | `fcli ssc session login --url <URL> -u <user> -p <pass>` |
 | FoD | `fcli_fod_session_list` | `fcli fod session login --url <URL> --client-id <id> --client-secret <secret>` |
 
 ---

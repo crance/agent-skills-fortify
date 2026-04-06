@@ -1,6 +1,20 @@
 # Remediation Workflow and Recommendations
 **Prerequisites:** Authentication verified (see SKILL.md)
 
+## Contents
+- [Use Case](#use-case)
+- [Critical: Prioritize Aviator Code Fixes](#critical-prioritize-aviator-code-fixes)
+- [Workflow Steps](#workflow-steps)
+- [Complete Example Flow](#complete-example-flow)
+- [Detecting Aviator Suggestions](#detecting-aviator-suggestions-code-pattern)
+- [Aviator Suggestion Characteristics](#aviator-suggestion-characteristics)
+- [Remediation Guidance by Category](#remediation-guidance-by-category)
+- [Updating Issue Status](#updating-issue-status)
+- [Troubleshooting](#troubleshooting)
+- [Best Practices](#best-practices)
+- [Related Workflows](#related-workflows)
+- [Why Prioritize Aviator?](#why-prioritize-aviator)
+
 ## Use Case
 You need to provide remediation recommendations and guidance for fixing security vulnerabilities. This includes prioritizing AI-generated code fixes from Fortify Aviator when available.
 
@@ -20,7 +34,7 @@ You need to provide remediation recommendations and guidance for fixing security
 First, identify the release to analyze. If uncertain, see [Finding Releases](find-release.md).
 
 ```tool
-fcli_fod_release_get --qualifiedReleaseNameOrId "MyApp:MyRelease"
+fcli_fod_release_get qualifiedReleaseNameOrId "MyApp:MyRelease"
 ```
 **Expected**: Release details including ID
 
@@ -33,7 +47,7 @@ Get issues with all relevant information including comments and recommendations:
 ```tool
 fcli_fod_issue_list 
   --release "MyApp:MyRelease"
-  --filters-param "severityString:Critical"
+  query {"severity": "Critical"}
   --embed "details,recommendations,history"
 ```
 
@@ -41,7 +55,7 @@ fcli_fod_issue_list
 ```tool
 fcli_fod_issue_list 
   --release "MyApp:MyRelease"
-  --filters-param "severityString:High"
+  query {"severity": "High"}
   --embed "details,recommendations,history"
 ```
 
@@ -156,12 +170,20 @@ After reviewing or fixing issues, update their analysis status:
 ```tool
 fcli_fod_issue_update 
   --release "MyApp:MyRelease"
-  issue-filters "issueId:38994"
-  analysis-status "In Remediation"
-  comment "Applied Aviator's suggested fix"
+  --vuln-ids "38994"
+  --dev-status "In Remediation"
+  --comment "Applied Aviator's suggested fix"
+  --user "developer@example.com"
 ```
 
-**Common Analysis Status Values**:
+**Parameters:**
+- `--vuln-ids` — Comma-separated list of issue IDs (the numeric `id` field from `issue_list`)
+- `--dev-status` — Developer analysis status (see values below)
+- `--auditor-status` — Auditor analysis status (alternative to `--dev-status`)
+- `--comment` — Comment to attach to the update
+- `--user` — **Required.** Username or user ID the update will be recorded as
+
+**Common Status Values**:
 - `Not an Issue` - False positive
 - `In Remediation` - Currently being fixed
 - `Reviewed` - Has been examined
@@ -212,18 +234,18 @@ The `history` data shows who changed what and when:
 fcli_fod_session_list refresh-cache=true
 
 # 2. Get release details
-fcli_fod_release_get --qualifiedReleaseNameOrId "MyApp:MyRelease"
+fcli_fod_release_get qualifiedReleaseNameOrId "MyApp:MyRelease"
 
 # 3. Retrieve Critical issues with full details
 fcli_fod_issue_list 
   --release "MyApp:MyRelease"
-  --filters-param "severityString:Critical"
+  query {"severity": "Critical"}
   --embed "details,recommendations,history"
 
 # 4. Retrieve High issues with full details
 fcli_fod_issue_list 
   --release "MyApp:MyRelease"
-  --filters-param "severityString:High"
+  query {"severity": "High"}
   --embed "details,recommendations,history"
 
 # 5. Process results:

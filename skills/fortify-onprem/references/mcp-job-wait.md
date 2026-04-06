@@ -3,6 +3,14 @@
 ## Use Case
 When pagination indicates background loading is in progress (indicated by `pagination.jobToken`), you must wait for the job to complete before accessing all records.
 
+## Contents
+- [When to Use](#when-to-use)
+- [Workflow Pattern](#workflow-pattern)
+- [Complete Example](#complete-example)
+- [Tool Name Variations](#tool-name-variations)
+- [Common Mistakes to Avoid](#common-mistakes-to-avoid)
+- [References](#references)
+
 ## When to Use
 - When `pagination.jobToken` is present in the response
 - When `pagination.hasMore` is true but `pagination.totalRecords` is not yet available

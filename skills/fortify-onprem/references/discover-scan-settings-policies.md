@@ -10,6 +10,17 @@ scan settings, scan policy, configuration, CICD token, scan setup, available set
 - Active SSC session (check with `fcli_ssc_session_list`)
 - SC-DAST environment configured with settings and policies by administrator
 
+## Contents
+- [Understanding Settings vs Policies](#understanding-settings-vs-policies)
+- [Discovery Operations](#discovery-operations)
+- [Complete Discovery Workflow](#complete-discovery-workflow)
+- [CICD Token vs ID](#cicd-token-vs-id)
+- [Pagination Handling](#pagination-handling)
+- [Troubleshooting](#troubleshooting)
+- [Use Cases](#use-cases)
+- [Best Practices](#best-practices)
+- [Integration with Scan Start](#integration-with-scan-start)
+
 ---
 
 ## Understanding Settings vs Policies
@@ -97,14 +108,16 @@ scan settings, scan policy, configuration, CICD token, scan setup, available set
 **Parameters:**
 ```json
 {
-  "--server-queries": "name~Production"
+  "query": { "name": ".*Production.*" }
 }
 ```
 
+**Explanation:** The `query.name` field accepts a regex pattern. Use `".*keyword.*"` for a contains match.
+
 **Use Cases:**
-- Find settings for specific application: `"name~MyApp"`
-- Find settings for environment: `"name~Production"`, `"name~Staging"`
-- Find settings by team: `"name~TeamA"`
+- Find settings for specific application: `{ "name": ".*MyApp.*" }`
+- Find settings for environment: `{ "name": ".*Production.*" }`, `{ "name": ".*Staging.*" }`
+- Find settings by team: `{ "name": ".*TeamA.*" }`
 
 ---
 
@@ -577,7 +590,7 @@ After discovery, use gathered information to start scan:
       "--settings": "PROD_WEB_APP",
       "--name": "Weekly Production Scan - Feb 16",
       "--policy": "Standard",
-      "--overwrite-scan-mode": true
+      "--mode": "CrawlAndAudit"
     }
   }
 ]
